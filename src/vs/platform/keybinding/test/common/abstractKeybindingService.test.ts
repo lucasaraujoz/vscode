@@ -190,7 +190,7 @@ suite('AbstractKeybindingService', () => {
 		statusMessageCallsDisposed = null;
 	});
 
-	function kbItem(keybinding: number, command: string, when?: ContextKeyExpression): ResolvedKeybindingItem {
+	function kbItem(keybinding: number | number[], command: string | null, when?: ContextKeyExpression): ResolvedKeybindingItem {
 		return new ResolvedKeybindingItem(
 			createUSLayoutResolvedKeybinding(keybinding, OS),
 			command,
@@ -205,6 +205,146 @@ suite('AbstractKeybindingService', () => {
 	function toUsLabel(keybinding: number): string {
 		return createUSLayoutResolvedKeybinding(keybinding, OS)!.getLabel()!;
 	}
+
+	suite('keybindings with empty-string/null command ID', () => {
+
+		test('a single-chord keybinding is dispatched correctly', () => {
+
+			const kbService = createTestKeybindingService([
+				kbItem(KeyMod.CtrlCmd | KeyCode.KeyK, 'myCommand'),
+			]);
+
+			// send Ctrl/Cmd + K
+			currentContextValue = createContext({});
+			const shouldPreventDefault = kbService.testDispatch(KeyMod.CtrlCmd | KeyCode.KeyK);
+			assert.deepStrictEqual(shouldPreventDefault, true);
+			assert.deepStrictEqual(executeCommandCalls, ([{ commandId: "myCommand", args: [null] }]));
+			assert.deepStrictEqual(showMessageCalls, []);
+			assert.deepStrictEqual(statusMessageCalls, []);
+			assert.deepStrictEqual(statusMessageCallsDisposed, []);
+
+			kbService.dispose();
+		});
+
+		test('a single-chord keybinding with an empty string command ID unbinds the keybinding (shouldPreventDefault = false)', () => {
+
+			const kbService = createTestKeybindingService([
+				kbItem(KeyMod.CtrlCmd | KeyCode.KeyK, 'myCommand'),
+				kbItem(KeyMod.CtrlCmd | KeyCode.KeyK, ''),
+			]);
+
+			// send Ctrl/Cmd + K
+			currentContextValue = createContext({});
+			const shouldPreventDefault = kbService.testDispatch(KeyMod.CtrlCmd | KeyCode.KeyK);
+			assert.deepStrictEqual(shouldPreventDefault, false);
+			assert.deepStrictEqual(executeCommandCalls, []);
+			assert.deepStrictEqual(showMessageCalls, []);
+			assert.deepStrictEqual(statusMessageCalls, []);
+			assert.deepStrictEqual(statusMessageCallsDisposed, []);
+
+			kbService.dispose();
+		});
+
+		test('a single-chord keybinding with a null command ID unbinds the keybinding (shouldPreventDefault = false)', () => {
+
+			const kbService = createTestKeybindingService([
+				kbItem(KeyMod.CtrlCmd | KeyCode.KeyK, 'myCommand'),
+				kbItem(KeyMod.CtrlCmd | KeyCode.KeyK, null),
+			]);
+
+			// send Ctrl/Cmd + K
+			currentContextValue = createContext({});
+			const shouldPreventDefault = kbService.testDispatch(KeyMod.CtrlCmd | KeyCode.KeyK);
+			assert.deepStrictEqual(shouldPreventDefault, false);
+			assert.deepStrictEqual(executeCommandCalls, []);
+			assert.deepStrictEqual(showMessageCalls, []);
+			assert.deepStrictEqual(statusMessageCalls, []);
+			assert.deepStrictEqual(statusMessageCallsDisposed, []);
+
+			kbService.dispose();
+		});
+
+		test('a multi-chord keybinding is dispatched correctly', () => {
+
+			const key = [KeyMod.CtrlCmd | KeyCode.KeyK, KeyMod.CtrlCmd | KeyCode.KeyI];
+			const kbService = createTestKeybindingService([
+				kbItem(key, 'myCommand'),
+			]);
+
+			currentContextValue = createContext({});
+
+			let shouldPreventDefault = kbService.testDispatch(KeyMod.CtrlCmd | KeyCode.KeyK);
+			assert.deepStrictEqual(shouldPreventDefault, true);
+			assert.deepStrictEqual(executeCommandCalls, []);
+			assert.deepStrictEqual(showMessageCalls, []);
+			assert.deepStrictEqual(statusMessageCalls, (["(⌘K) was pressed. Waiting for second key of chord..."]));
+			assert.deepStrictEqual(statusMessageCallsDisposed, []);
+
+			shouldPreventDefault = kbService.testDispatch(KeyMod.CtrlCmd | KeyCode.KeyI);
+			assert.deepStrictEqual(shouldPreventDefault, true);
+			assert.deepStrictEqual(executeCommandCalls, ([{ commandId: "myCommand", args: [null] }]));
+			assert.deepStrictEqual(showMessageCalls, []);
+			assert.deepStrictEqual(statusMessageCalls, (["(⌘K) was pressed. Waiting for second key of chord..."]));
+			assert.deepStrictEqual(statusMessageCallsDisposed, (["(⌘K) was pressed. Waiting for second key of chord..."]));
+
+			kbService.dispose();
+		});
+
+		test('a multi-chord keybinding with an empty-string command ID keeps the keybinding', () => {
+
+			const key = [KeyMod.CtrlCmd | KeyCode.KeyK, KeyMod.CtrlCmd | KeyCode.KeyI];
+			const kbService = createTestKeybindingService([
+				kbItem(key, 'myCommand'),
+				kbItem(key, ''),
+			]);
+
+			currentContextValue = createContext({});
+
+			let shouldPreventDefault = kbService.testDispatch(KeyMod.CtrlCmd | KeyCode.KeyK);
+			assert.deepStrictEqual(shouldPreventDefault, true);
+			assert.deepStrictEqual(executeCommandCalls, []);
+			assert.deepStrictEqual(showMessageCalls, []);
+			assert.deepStrictEqual(statusMessageCalls, (["(⌘K) was pressed. Waiting for second key of chord..."]));
+			assert.deepStrictEqual(statusMessageCallsDisposed, []);
+
+			shouldPreventDefault = kbService.testDispatch(KeyMod.CtrlCmd | KeyCode.KeyI);
+			assert.deepStrictEqual(shouldPreventDefault, true);
+			assert.deepStrictEqual(executeCommandCalls, []);
+			assert.deepStrictEqual(showMessageCalls, []);
+			assert.deepStrictEqual(statusMessageCalls, (["(⌘K) was pressed. Waiting for second key of chord...", "The key combination (⌘K, ⌘I) is not a command."]));
+			assert.deepStrictEqual(statusMessageCallsDisposed, (["(⌘K) was pressed. Waiting for second key of chord..."]));
+
+			kbService.dispose();
+		});
+
+		test('a multi-chord keybinding with a null command ID keeps the keybinding', () => {
+
+			const key = [KeyMod.CtrlCmd | KeyCode.KeyK, KeyMod.CtrlCmd | KeyCode.KeyI];
+			const kbService = createTestKeybindingService([
+				kbItem(key, 'myCommand'),
+				kbItem(key, null),
+			]);
+
+			currentContextValue = createContext({});
+
+			let shouldPreventDefault = kbService.testDispatch(KeyMod.CtrlCmd | KeyCode.KeyK);
+			assert.deepStrictEqual(shouldPreventDefault, true);
+			assert.deepStrictEqual(executeCommandCalls, []);
+			assert.deepStrictEqual(showMessageCalls, []);
+			assert.deepStrictEqual(statusMessageCalls, (["(⌘K) was pressed. Waiting for second key of chord..."]));
+			assert.deepStrictEqual(statusMessageCallsDisposed, []);
+
+			shouldPreventDefault = kbService.testDispatch(KeyMod.CtrlCmd | KeyCode.KeyI);
+			assert.deepStrictEqual(shouldPreventDefault, true);
+			assert.deepStrictEqual(executeCommandCalls, []);
+			assert.deepStrictEqual(showMessageCalls, []);
+			assert.deepStrictEqual(statusMessageCalls, (["(⌘K) was pressed. Waiting for second key of chord...", "The key combination (⌘K, ⌘I) is not a command."]));
+			assert.deepStrictEqual(statusMessageCallsDisposed, (["(⌘K) was pressed. Waiting for second key of chord..."]));
+
+			kbService.dispose();
+		});
+
+	});
 
 	test('issue #16498: chord mode is quit for invalid chords', () => {
 
