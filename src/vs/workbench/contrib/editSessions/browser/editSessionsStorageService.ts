@@ -18,7 +18,7 @@ import { createSyncHeaders, IAuthenticationProvider, IResourceRefHandle } from '
 import { UserDataSyncStoreClient } from 'vs/platform/userDataSync/common/userDataSyncStoreService';
 import { AuthenticationSession, AuthenticationSessionsChangeEvent, IAuthenticationService } from 'vs/workbench/services/authentication/common/authentication';
 import { IExtensionService } from 'vs/workbench/services/extensions/common/extensions';
-import { EDIT_SESSIONS_SIGNED_IN, EditSession, EDIT_SESSION_SYNC_CATEGORY, IEditSessionsStorageService, EDIT_SESSIONS_SIGNED_IN_KEY, IEditSessionsLogService } from 'vs/workbench/contrib/editSessions/common/editSessions';
+import { EDIT_SESSIONS_SIGNED_IN, EditSession, EDIT_SESSION_SYNC_CATEGORY, IEditSessionsStorageService, EDIT_SESSIONS_SIGNED_IN_KEY, IEditSessionsLogService, SyncResource } from 'vs/workbench/contrib/editSessions/common/editSessions';
 import { IDialogService } from 'vs/platform/dialogs/common/dialogs';
 import { generateUuid } from 'vs/base/common/uuid';
 import { ICredentialsService } from 'vs/platform/credentials/common/credentials';
@@ -95,17 +95,17 @@ export class EditSessionsWorkbenchService extends Disposable implements IEditSes
 	 * @param editSession An object representing edit session state to be restored.
 	 * @returns The ref of the stored edit session state.
 	 */
-	async write(editSession: EditSession): Promise<string> {
+	async write(resource: SyncResource, content: string | EditSession): Promise<string> {
 		await this.initialize(false);
 		if (!this.initialized) {
 			throw new Error('Please sign in to store your edit session.');
 		}
 
-		if (editSession.machine === undefined) {
-			editSession.machine = await this.getOrCreateCurrentMachineId();
+		if (typeof content !== 'string' && content.machine === undefined) {
+			content.machine = await this.getOrCreateCurrentMachineId();
 		}
 
-		return this.storeClient!.writeResource('editSessions', JSON.stringify(editSession), null, undefined, createSyncHeaders(generateUuid()));
+		return this.storeClient!.writeResource(resource, typeof content === 'string' ? content : JSON.stringify(content), null, undefined, createSyncHeaders(generateUuid()));
 	}
 
 	/**
@@ -114,7 +114,7 @@ export class EditSessionsWorkbenchService extends Disposable implements IEditSes
 	 *
 	 * @returns An object representing the requested or latest edit session state, if any.
 	 */
-	async read(ref: string | undefined): Promise<{ ref: string; editSession: EditSession } | undefined> {
+	async read(resource: SyncResource, ref: string | undefined): Promise<{ ref: string; content: string } | undefined> {
 		await this.initialize(false);
 		if (!this.initialized) {
 			throw new Error('Please sign in to apply your latest edit session.');
@@ -124,9 +124,9 @@ export class EditSessionsWorkbenchService extends Disposable implements IEditSes
 		const headers = createSyncHeaders(generateUuid());
 		try {
 			if (ref !== undefined) {
-				content = await this.storeClient?.resolveResourceContent('editSessions', ref, undefined, headers);
+				content = await this.storeClient?.resolveResourceContent(resource, ref, undefined, headers);
 			} else {
-				const result = await this.storeClient?.readResource('editSessions', null, undefined, headers);
+				const result = await this.storeClient?.readResource(resource, null, undefined, headers);
 				content = result?.content;
 				ref = result?.ref;
 			}
@@ -135,30 +135,30 @@ export class EditSessionsWorkbenchService extends Disposable implements IEditSes
 		}
 
 		// TODO@joyceerhl Validate session data, check schema version
-		return (content !== undefined && content !== null && ref !== undefined) ? { ref: ref, editSession: JSON.parse(content) } : undefined;
+		return (content !== undefined && content !== null && ref !== undefined) ? { ref, content } : undefined;
 	}
 
-	async delete(ref: string | null) {
+	async delete(resource: SyncResource, ref: string | null) {
 		await this.initialize(false);
 		if (!this.initialized) {
 			throw new Error(`Unable to delete edit session with ref ${ref}.`);
 		}
 
 		try {
-			await this.storeClient?.deleteResource('editSessions', ref);
+			await this.storeClient?.deleteResource(resource, ref);
 		} catch (ex) {
 			this.logService.error(ex);
 		}
 	}
 
-	async list(): Promise<IResourceRefHandle[]> {
+	async list(resource: SyncResource): Promise<IResourceRefHandle[]> {
 		await this.initialize(false);
 		if (!this.initialized) {
 			throw new Error(`Unable to list edit sessions.`);
 		}
 
 		try {
-			return this.storeClient?.getAllResourceRefs('editSessions') ?? [];
+			return this.storeClient?.getAllResourceRefs(resource) ?? [];
 		} catch (ex) {
 			this.logService.error(ex);
 		}

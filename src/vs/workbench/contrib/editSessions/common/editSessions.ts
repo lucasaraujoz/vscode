@@ -20,6 +20,8 @@ export const EDIT_SESSION_SYNC_CATEGORY: ILocalizedString = {
 	value: localize('cloud changes', 'Cloud Changes')
 };
 
+export type SyncResource = 'editSessions' | 'workspaceState';
+
 export const IEditSessionsStorageService = createDecorator<IEditSessionsStorageService>('IEditSessionsStorageService');
 export interface IEditSessionsStorageService {
 	_serviceBrand: undefined;
@@ -31,10 +33,10 @@ export interface IEditSessionsStorageService {
 	readonly onDidSignOut: Event<void>;
 
 	initialize(silent?: boolean): Promise<boolean>;
-	read(ref: string | undefined): Promise<{ ref: string; editSession: EditSession } | undefined>;
-	write(editSession: EditSession): Promise<string>;
-	delete(ref: string | null): Promise<void>;
-	list(): Promise<IResourceRefHandle[]>;
+	read(resource: SyncResource, ref: string | undefined): Promise<{ ref: string; content: string } | undefined>;
+	write(resource: SyncResource, content: string | EditSession): Promise<string>;
+	delete(resource: SyncResource, ref: string | null): Promise<void>;
+	list(resource: SyncResource): Promise<IResourceRefHandle[]>;
 	getMachineById(machineId: string): Promise<string | undefined>;
 }
 
@@ -79,7 +81,6 @@ export interface EditSession {
 	version: number;
 	machine?: string;
 	folders: Folder[];
-	state: { [key: string]: unknown };
 }
 
 export const EDIT_SESSIONS_SIGNED_IN_KEY = 'editSessionsSignedIn';

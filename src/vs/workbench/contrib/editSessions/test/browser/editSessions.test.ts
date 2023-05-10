@@ -43,6 +43,7 @@ import { NullTelemetryService } from 'vs/platform/telemetry/common/telemetryUtil
 import { IRemoteAgentService } from 'vs/workbench/services/remote/common/remoteAgentService';
 import { IExtensionService } from 'vs/workbench/services/extensions/common/extensions';
 import { IEditSessionIdentityService } from 'vs/platform/workspace/common/editSessions';
+import { IUserDataProfilesService } from 'vs/platform/userDataProfile/common/userDataProfile';
 
 const folderName = 'test-folder';
 const folderUri = URI.file(`/${folderName}`);
@@ -137,6 +138,21 @@ suite('Edit session sync', () => {
 				return 'test-identity';
 			}
 		});
+		instantiationService.stub(IUserDataProfilesService, new class extends mock<IUserDataProfilesService>() {
+			override defaultProfile = {
+				id: 'default',
+				name: 'Default',
+				isDefault: true,
+				location: URI.file('location'),
+				globalStorageHome: URI.file('globalStorageHome'),
+				settingsResource: URI.file('settingsResource'),
+				keybindingsResource: URI.file('keybindingsResource'),
+				tasksResource: URI.file('tasksResource'),
+				snippetsHome: URI.file('snippetsHome'),
+				extensionsResource: URI.file('extensionsResource'),
+				cacheHome: URI.file('cacheHome'),
+			};
+		});
 
 		editSessionsContribution = instantiationService.createInstance(EditSessionsContribution);
 	});
@@ -167,7 +183,7 @@ suite('Edit session sync', () => {
 		};
 
 		// Stub sync service to return edit session data
-		const readStub = sandbox.stub().returns({ editSession, ref: '0' });
+		const readStub = sandbox.stub().returns({ content: JSON.stringify(editSession), ref: '0' });
 		instantiationService.stub(IEditSessionsStorageService, 'read', readStub);
 
 		// Create root folder
